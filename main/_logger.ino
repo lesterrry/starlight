@@ -1,6 +1,6 @@
 class Logger {
   public:
-    Logger(int active, unsigned long baud = 9600) {  // constructor
+    Logger(bool active, unsigned long baud = 9600) {  // constructor
       _active = active;
       _baud = baud;
     }
@@ -18,4 +18,3 @@ class Logger {
     int _active;
     unsigned long _baud;
 };
-
