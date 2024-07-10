@@ -12,6 +12,8 @@ me@aydar.media
 
 // #define DEBUG_TONES
 // #define DEBUG_MODULES
+#define QUICK_BOOT
+#define FASTLED_INTERNAL
 
 #define RELAY_PIN      7
 #define RADIO_PIN      31
@@ -27,6 +29,7 @@ me@aydar.media
 #define LED_PIN        27
 #define LED_NUMBER     8
 #define LED_BRIGHTNESS 100
+#define TIMEZONE 3
 
 #include <microDS3231.h>
 #include <SPI.h>

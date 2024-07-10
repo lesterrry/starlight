@@ -7,9 +7,36 @@ Knob knob(ENC_CLK_PIN, ENC_DT_PIN, ENC_SW_PIN);
 Buzzer buzzer(BUZZER_PIN);
 LED led(LED_NUMBER, LED_BRIGHTNESS);
 
+uint32_t bootTime;
+Page currentPage = Home;
+bool actionWasMade = false;
+
+void handleKnobRotation(bool direction) {
+  logger.print("Current page: " + String(currentPage));
+  if (direction == Left) {
+    if (currentPage <= Info) return;
+    currentPage = currentPage - 1;
+  } else {
+    if (currentPage >= TimeSettings) return;
+    currentPage = currentPage + 1;
+  }
+}
+
+void renderPage(uint8_t page) {
+  switch (page) {
+    case Info: {
+      String uptime = "UP " + rtc.getUnixDelta(bootTime);
+      display.renderLayout(Display::List, PAGE_NAMES[page], uptime);
+      break;
+    }
+    default:
+      display.renderLayout(Display::List, PAGE_NAMES[page]);
+  }
+}
+
 void setup() {
   logger.begin();
-  logger.print(F("Suburbs Sunset initializing..."));
+  logger.print(F("Sunset initializing..."));
   logger.print(VERSION);
 
   if (!rtc.isConnected()) {
@@ -22,16 +49,20 @@ void setup() {
 
     logger.print("[RTC] time: '" + rtc.getTime() + "'");
     logger.print("[RTC] date: '" + rtc.getDate() + "'");
+
+    bootTime = rtc.unix();
   }
 
   display.begin();
-  display.renderTitle(F("SUBURBS:"), F("SUNSET"));
-  buzzer.playToneB();
-  delay(2000);
-  display.renderTitle("", VERSION);
-  delay(1000);
-  display.clear();
 
+  #ifndef QUICK_BOOT
+    display.renderTitle(F("SUBURBS:"), F("SUNSET"));
+    buzzer.playToneB();
+    delay(2000);
+    display.renderTitle("", VERSION);
+    delay(1000);
+    display.clear();
+  #endif
   #ifdef DEBUG_TONES
 		int i = 50;
 		while(true) {
@@ -43,7 +74,7 @@ void setup() {
 	#endif
   #ifdef DEBUG_MODULES
     led.light(CRGB::Purple);
-    display.renderTitle("DEBUG", "");
+    display.renderTitle("DEBUG");
     logger.print("Relay switching on...");
     relay.on();
     delay(1000);
@@ -67,15 +98,30 @@ void setup() {
 		}
 	#endif
 
+  renderPage(currentPage);
+
   logger.print(F("Entering loop..."));
 }
 
 void loop() {
   knob.update();
 
+  actionWasMade = false;
+
   if (knob.isRight()) {
     buzzer.beep(4);
+    handleKnobRotation(Right);
+    actionWasMade = true;
   } else if (knob.isLeft()) {
     buzzer.beep(3);
+    handleKnobRotation(Left);
+    actionWasMade = true;
+  } else if (knob.isClick()) {
+    buzzer.beep(6, 100);
+    actionWasMade = true;
+  }
+
+  if (actionWasMade) {
+    renderPage(currentPage);
   }
 }

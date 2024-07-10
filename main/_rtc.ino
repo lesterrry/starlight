@@ -12,6 +12,14 @@ class RTC {
       setTime(BUILD_SEC, BUILD_MIN, BUILD_HOUR, BUILD_DAY, BUILD_MONTH, BUILD_YEAR);
     }
 
+    DateTime now() {
+      return _rtc.getTime();
+    }
+
+    uint32_t unix() {
+      return _rtc.getUnix(TIMEZONE);
+    }
+
     String getTime() {
       String time = "";
 
@@ -42,6 +50,39 @@ class RTC {
       date += String(month);
 
       return date;
+    }
+
+    String getUnixDelta(uint32_t pastTime) {
+      uint32_t current = unix();
+      uint32_t delta = current - pastTime;
+
+      return unixToString(delta);
+    }
+
+    String unixToString(long seconds) {
+      String timeString;
+
+      int days = seconds / 86400;
+      seconds = seconds % 86400;
+      
+      int hours = seconds / 3600;
+      seconds = seconds % 3600;
+      
+      int minutes = seconds / 60;
+      seconds = seconds % 60;
+
+      if(days > 0){
+        timeString += String(days) + "d ";
+      }
+      if(hours > 0){
+        timeString += String(hours) + "h ";
+      }
+      if(minutes > 0){
+        timeString += String(minutes) + "m ";
+      }
+      timeString += String(seconds) + "s";
+
+      return timeString;
     }
 
   private:

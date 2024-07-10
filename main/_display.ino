@@ -1,5 +1,10 @@
 class Display {
   public:
+    enum Layout {
+      List,
+      ListWithBigTitle
+    };
+
     Display(int mosiPin, int clkPin, int dcPin, int resetPin, int csPin) {
       _display = Adafruit_SSD1306(mosiPin, clkPin, dcPin, resetPin, csPin);
     }
@@ -31,18 +36,35 @@ class Display {
       _display.setTextColor(color);
     }
 
-    void setCursor(int16_t x, int16_t y) {
-      _display.setCursor(x, y);
+    void setCursor(int16_t x, int8_t y) {
+      _display.setCursor(x, y * 8);
     }
 
-    void renderTitle(String title, String subtitle) {
+    void renderTitle(String title, String subtitle = "") {
       _display.clearDisplay();
+      
       setTextSize(2);
-      setCursor(0,8);
+      setCursor(0, 1);
       print(title);
+
       setTextSize(1);
-      setCursor(0,25);
+      setCursor(0, 3);
       print(subtitle);
+
+      render();
+    }
+
+    void renderLayout(Layout layout = List, String upperNote = "", String title = "") {
+      _display.clearDisplay();
+
+      setTextSize(1);
+      setCursor(0, 0);
+      print(upperNote);
+
+      setTextSize(1);
+      setCursor(0, 1);
+      print(title);
+
       render();
     }
 
