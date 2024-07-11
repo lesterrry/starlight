@@ -10,7 +10,9 @@ LED led(LED_NUMBER, LED_BRIGHTNESS);
 uint32_t bootTime;
 Page currentPage = Home;
 bool actionWasMade = false;
-unsigned long timer = 0;
+
+unsigned long timer_pageRender = 0;
+unsigned long timer_pageReset = 0;
 
 void handleKnobRotation(bool direction) {
   logger.print("Current page: " + String(currentPage));
@@ -26,8 +28,9 @@ void handleKnobRotation(bool direction) {
 void renderPage(uint8_t page) {
   switch (page) {
     case Info: {
-      String uptime = "UP " + rtc.getUnixDelta(bootTime);
-      display.renderLayout(Display::List, PAGE_NAMES[page], uptime);
+      String uptime = "UP: " + rtc.getUnixDelta(bootTime);
+      String temp = "TEMP: " + String(rtc.getTemp());
+      display.renderLayout(Display::List, PAGE_NAMES[page], uptime, temp);
       break;
     }
     default:
@@ -127,15 +130,25 @@ void loop() {
   }
 
   if (actionWasMade) {
+    timer_pageReset = current;
     renderPage(currentPage);
   }
 
-  if (current - timer >= 1000) {
+  if (current - timer_pageRender >= 1000) {
     if (currentPage == Info) {
       renderPage(currentPage);
     }
 
-    timer = current;
+    timer_pageRender = current;
+  }
+
+  if (current - timer_pageReset >= 10000) {
+    if (currentPage != Home) {
+      currentPage = Home;
+      renderPage(currentPage);
+    }
+
+    timer_pageReset = current;
   }
 
 }

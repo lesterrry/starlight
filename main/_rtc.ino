@@ -12,6 +12,10 @@ class RTC {
       setTime(BUILD_SEC, BUILD_MIN, BUILD_HOUR, BUILD_DAY, BUILD_MONTH, BUILD_YEAR);
     }
 
+    float getTemp() {
+      return _rtc.getTemperatureFloat();
+    }
+
     DateTime now() {
       return _rtc.getTime();
     }

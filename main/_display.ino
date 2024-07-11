@@ -54,7 +54,7 @@ class Display {
       render();
     }
 
-    void renderLayout(Layout layout = List, String upperNote = "", String title = "") {
+    void renderLayout(Layout layout = List, String upperNote = "", String title = "", String subtitle = "") {
       _display.clearDisplay();
 
       setTextSize(1);
@@ -64,6 +64,10 @@ class Display {
       setTextSize(1);
       setCursor(0, 1);
       print(title);
+
+      setTextSize(1);
+      setCursor(0, 2);
+      print(subtitle);
 
       render();
     }
