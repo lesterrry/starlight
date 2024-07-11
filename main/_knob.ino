@@ -9,6 +9,10 @@ class Knob {
       _encoder.tick();
     }
 
+    void reset() {
+      _encoder.resetStates();
+    }
+
     bool isLeft(bool pressed = false) {
       return pressed ? _encoder.isLeftH() : _encoder.isLeft();
     }

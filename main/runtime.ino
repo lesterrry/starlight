@@ -60,7 +60,7 @@ void setup() {
     display.renderTitle(F("SUBURBS:"), F("SUNSET"));
     buzzer.playToneB();
     delay(2000);
-    display.renderTitle("", VERSION);
+    display.renderTitle("", String(VERSION) + "      " + String(BUILD_DATE));
     delay(1000);
     display.clear();
   #endif
@@ -100,6 +100,8 @@ void setup() {
 	#endif
 
   renderPage(currentPage);
+
+  knob.reset();
 
   logger.print(F("Entering loop..."));
 }
