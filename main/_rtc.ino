@@ -71,13 +71,13 @@ class RTC {
       int minutes = seconds / 60;
       seconds = seconds % 60;
 
-      if(days > 0){
+      if (days > 0) {
         timeString += String(days) + "d ";
       }
-      if(hours > 0){
+      if (hours > 0) {
         timeString += String(hours) + "h ";
       }
-      if(minutes > 0){
+      if (minutes > 0) {
         timeString += String(minutes) + "m ";
       }
       timeString += String(seconds) + "s";

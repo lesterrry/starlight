@@ -10,6 +10,7 @@ LED led(LED_NUMBER, LED_BRIGHTNESS);
 uint32_t bootTime;
 Page currentPage = Home;
 bool actionWasMade = false;
+unsigned long timer = 0;
 
 void handleKnobRotation(bool direction) {
   logger.print("Current page: " + String(currentPage));
@@ -104,6 +105,8 @@ void setup() {
 }
 
 void loop() {
+  unsigned long current = millis();
+
   knob.update();
 
   actionWasMade = false;
@@ -124,4 +127,13 @@ void loop() {
   if (actionWasMade) {
     renderPage(currentPage);
   }
+
+  if (current - timer >= 1000) {
+    if (currentPage == Info) {
+      renderPage(currentPage);
+    }
+
+    timer = current;
+  }
+
 }
