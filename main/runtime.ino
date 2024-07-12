@@ -9,13 +9,20 @@ LED led(LED_NUMBER, LED_BRIGHTNESS);
 
 uint32_t bootTime;
 Page currentPage = Home;
-bool actionWasMade = false;
+Mode currentMode = Manual;
+bool pageSwitched = false;
+bool homeWithTime = false;
+bool displaySleeping = false;
+bool knobDown = false;
 
 unsigned long timer_pageRender = 0;
 unsigned long timer_pageReset = 0;
+uint8_t counter_displaySleep = 0;
 
 void handleKnobRotation(bool direction) {
   logger.print("Current page: " + String(currentPage));
+  if (displaySleeping) return;
+
   if (direction == Left) {
     if (currentPage <= Info) return;
     currentPage = currentPage - 1;
@@ -30,11 +37,17 @@ void renderPage(uint8_t page) {
     case Info: {
       String uptime = "UP: " + rtc.getUnixDelta(bootTime);
       String temp = "TEMP: " + String(rtc.getTemp());
-      display.renderLayout(Display::List, PAGE_NAMES[page], uptime, temp);
+      String version = String(VERSION) + " (" + String(BUILD_DATE) + ")";
+      display.renderLayout(Display::List, PAGE_NAMES[page], uptime, temp, version);
       break;
     }
-    default:
+    case Home: {
+      display.renderLayout(Display::ListWithBigTitle, homeWithTime ? rtc.getTime(true) : PAGE_NAMES[page], "MANUAL");
+      break;
+    }
+    default: {
       display.renderLayout(Display::List, PAGE_NAMES[page]);
+    }
   }
 }
 
@@ -114,35 +127,62 @@ void loop() {
 
   knob.update();
 
-  actionWasMade = false;
+  pageSwitched = false;
 
   if (knob.isRight()) {
     buzzer.beep(4);
     handleKnobRotation(Right);
-    actionWasMade = true;
+    pageSwitched = true;
   } else if (knob.isLeft()) {
     buzzer.beep(3);
     handleKnobRotation(Left);
-    actionWasMade = true;
+    pageSwitched = true;
   } else if (knob.isClick()) {
     buzzer.beep(6, 100);
-    actionWasMade = true;
+    pageSwitched = true;
+  } else if (knob.isDown()) {
+    if (knob.isRight(true)) {
+      logger.print("right");
+    } else if (knob.isLeft(true)) {
+      logger.print("left");
+    }
+    knobDown = true;
+  } else if (knobDown) {
+    knobDown = false;
   }
 
-  if (actionWasMade) {
+  if (pageSwitched) {
     timer_pageReset = current;
+    timer_pageRender = current;
+    counter_displaySleep = 0;
+    displaySleeping = false;
+    homeWithTime = false;
     renderPage(currentPage);
   }
 
-  if (current - timer_pageRender >= 1000) {
+  if (current - timer_pageRender >= 1000 && !displaySleeping) {
+    bool needsRerender = false;
     if (currentPage == Info) {
-      renderPage(currentPage);
+      needsRerender = true;
+    } else if (currentPage == Home) {
+      homeWithTime = true;
+      needsRerender = true;
     }
+
+    if(needsRerender) renderPage(currentPage);
 
     timer_pageRender = current;
   }
 
   if (current - timer_pageReset >= 10000) {
+    if (counter_displaySleep < 2) {
+      counter_displaySleep++;
+      displaySleeping = false;
+    } else {
+      display.clear();
+      displaySleeping = true;
+    }
+
     if (currentPage != Home) {
       currentPage = Home;
       renderPage(currentPage);

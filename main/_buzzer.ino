@@ -1,6 +1,6 @@
 class Buzzer {
   public:
-    Buzzer(int pin) {  // constructor
+    Buzzer(int pin) {
       _pin = pin;
     }
 

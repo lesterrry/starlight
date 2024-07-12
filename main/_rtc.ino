@@ -24,7 +24,7 @@ class RTC {
       return _rtc.getUnix(TIMEZONE);
     }
 
-    String getTime() {
+    String getTime(bool withSeconds = false) {
       String time = "";
 
       int8_t hour = _rtc.getHours();
@@ -36,6 +36,14 @@ class RTC {
       int8_t minute = _rtc.getMinutes();
       if (minute < 10) time += '0';
       time += String(minute);
+
+      if (withSeconds) {
+        time += ':';
+
+        int8_t second = _rtc.getSeconds();
+        if (second < 10) time += '0';
+        time += String(second);
+      }
 
       return time;
     }

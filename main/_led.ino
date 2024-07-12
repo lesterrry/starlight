@@ -1,6 +1,6 @@
 class LED {
   public:
-    LED(uint16_t numLeds, uint8_t brightness) {  // constructor
+    LED(uint16_t numLeds, uint8_t brightness) {
       _leds = new CRGB[numLeds];
       _numLeds = numLeds;
       FastLED.addLeds<WS2811, LED_PIN, GRB>(_leds, numLeds);

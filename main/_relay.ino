@@ -1,6 +1,6 @@
 class Relay {
   public:
-    Relay(int pin) {  // constructor
+    Relay(int pin) {
       pinMode(pin, OUTPUT);
       _pin = pin;
       _state = LOW;

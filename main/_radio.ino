@@ -1,6 +1,6 @@
 class Radio {
   public:
-    Radio(int pin) {  // constructor
+    Radio(int pin) {
       pinMode(pin, INPUT);
       _pin = pin;
     }

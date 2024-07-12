@@ -1,6 +1,6 @@
 class Logger {
   public:
-    Logger(bool active, unsigned long baud = 9600) {  // constructor
+    Logger(bool active, unsigned long baud = 9600) {
       _active = active;
       _baud = baud;
     }

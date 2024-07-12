@@ -1,6 +1,6 @@
 class Knob {
   public:
-    Knob(int clkPin, int dtPin, int swPin, bool type = TYPE2) {  // constructor
+    Knob(int clkPin, int dtPin, int swPin, bool type = TYPE2) {
       _encoder = Encoder(clkPin, dtPin, swPin, type);
       _encoder.setType(type);
     }
@@ -23,6 +23,10 @@ class Knob {
 
     bool isClick() {
       return _encoder.isClick();
+    }
+
+    bool isDown() {
+      return _encoder.isHold();
     }
 
     bool isAnyTurn() {

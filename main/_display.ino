@@ -54,20 +54,34 @@ class Display {
       render();
     }
 
-    void renderLayout(Layout layout = List, String upperNote = "", String title = "", String subtitle = "") {
+    void renderLayout(Layout layout = List, String upperNote = "", String title = "", String subtitle = "", String lowerNote = "") {
       _display.clearDisplay();
 
       setTextSize(1);
       setCursor(0, 0);
       print(upperNote);
 
-      setTextSize(1);
-      setCursor(0, 1);
-      print(title);
+      if (layout == List) {
+        setTextSize(1);
+        setCursor(0, 1);
+        print(title);
 
-      setTextSize(1);
-      setCursor(0, 2);
-      print(subtitle);
+        setTextSize(1);
+        setCursor(0, 2);
+        print(subtitle);
+
+        setTextSize(1);
+        setCursor(0, 3);
+        print(lowerNote);
+      } else {
+        setTextSize(2);
+        setCursor(0, 1);
+        print(title);
+
+        setTextSize(1);
+        setCursor(0, 3);
+        print(lowerNote);
+      }
 
       render();
     }
