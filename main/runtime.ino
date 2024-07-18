@@ -11,44 +11,98 @@ uint32_t bootTime;
 Page currentPage = Home;
 Mode currentMode = Manual;
 bool pageSwitched = false;
+bool modeSwitched = false;
 bool homeWithTime = false;
 bool displaySleeping = false;
+bool cursorVisible = false;
 bool knobDown = false;
+uint8_t cursorPosition = 0;
 
 unsigned long timer_pageRender = 0;
 unsigned long timer_pageReset = 0;
+unsigned long counter_knobDown = 0;
 uint8_t counter_displaySleep = 0;
 
-void handleKnobRotation(bool direction) {
+void handleKnobRotation(bool direction, bool pressed = false) {
   logger.print("Current page: " + String(currentPage));
   if (displaySleeping) return;
 
-  if (direction == Left) {
-    if (currentPage <= Info) return;
-    currentPage = currentPage - 1;
+  if (pressed) {
+    if (currentPage == Home) {
+      if (direction == Left) {
+        buzzer.beep(5);
+        currentMode = currentMode <= Manual ? SleepTimer : currentMode - 1;
+      } else {
+        buzzer.beep(6);
+        currentMode = currentMode >= SleepTimer ? Manual : currentMode + 1;
+      }
+    }
   } else {
-    if (currentPage >= TimeSettings) return;
-    currentPage = currentPage + 1;
+    if (direction == Left) {
+      if (currentPage <= Info) return;
+      currentPage = currentPage - 1;
+    } else {
+      if (currentPage >= TimeSettings) return;
+      currentPage = currentPage + 1;
+    }
+  }
+}
+
+void handleKnobPress(bool pressed) {
+  if (pressed) {
+    cursorVisible = true;
+  } else {
+    cursorVisible = false;
+  }
+}
+
+void handleKnobClick() {
+  if (currentPage == Home) {
+    toggleRelay();
   }
 }
 
 void renderPage(uint8_t page) {
+  logger.print("Rendering page " + String(page));
   switch (page) {
     case Info: {
       String uptime = "UP: " + rtc.getUnixDelta(bootTime);
       String temp = "TEMP: " + String(rtc.getTemp());
       String version = String(VERSION) + " (" + String(BUILD_DATE) + ")";
-      display.renderLayout(Display::List, PAGE_NAMES[page], uptime, temp, version);
+      display.renderLayout(Display::List, true, PAGE_NAMES[page], uptime, temp, version);
       break;
     }
     case Home: {
-      display.renderLayout(Display::ListWithBigTitle, homeWithTime ? rtc.getTime(true) : PAGE_NAMES[page], "MANUAL");
+      display.clear(false);
+      printRelayStatus();
+      if (cursorVisible) display.printCursor(Display::ListWithBigTitle);
+      display.renderLayout(Display::ListWithBigTitle, false, homeWithTime ? rtc.getTime(true) : PAGE_NAMES[page], MODE_NAMES[currentMode]);
+      break;
+    }
+    case ScheduleSettings: {
+      String on = "ON:  ";
+      String off = "OFF: ";
+      display.renderLayout(Display::List, true, PAGE_NAMES[page], on, off);
       break;
     }
     default: {
-      display.renderLayout(Display::List, PAGE_NAMES[page]);
+      display.renderLayout(Display::List, true, PAGE_NAMES[page]);
     }
   }
+}
+
+void printRelayStatus() {
+  if (relay.getState()) {
+    display.printCornerChar('I');
+  } else {
+    display.printCornerChar('O');
+  }
+}
+
+void toggleRelay() {
+  led.toggle();
+  relay.toggle();
+  buzzer.beep(6, 100, !relay.getState());
 }
 
 void setup() {
@@ -128,6 +182,7 @@ void loop() {
   knob.update();
 
   pageSwitched = false;
+  modeSwitched = false;
 
   if (knob.isRight()) {
     buzzer.beep(4);
@@ -138,25 +193,39 @@ void loop() {
     handleKnobRotation(Left);
     pageSwitched = true;
   } else if (knob.isClick()) {
-    buzzer.beep(6, 100);
-    pageSwitched = true;
+    handleKnobClick();
+    modeSwitched = true;
   } else if (knob.isDown()) {
-    if (knob.isRight(true)) {
-      logger.print("right");
-    } else if (knob.isLeft(true)) {
-      logger.print("left");
+    counter_knobDown++;
+    if (counter_knobDown > 1750) {
+      if (knob.isRight(true)) {
+        handleKnobRotation(Right, true);
+        modeSwitched = true;
+      } else if (knob.isLeft(true)) {
+        handleKnobRotation(Left, true);
+        modeSwitched = true;
+      }
+      if (!knobDown) {
+        handleKnobPress(true);
+        modeSwitched = true;
+      }
+      knobDown = true;
     }
-    knobDown = true;
   } else if (knobDown) {
+    handleKnobPress(false);
     knobDown = false;
+    modeSwitched = true;
+    counter_knobDown = 0;
+  } else {
+    counter_knobDown = 0;
   }
 
-  if (pageSwitched) {
+  if (pageSwitched || modeSwitched) {
     timer_pageReset = current;
     timer_pageRender = current;
     counter_displaySleep = 0;
     displaySleeping = false;
-    homeWithTime = false;
+    if (pageSwitched) homeWithTime = false;
     renderPage(currentPage);
   }
 
@@ -190,5 +259,4 @@ void loop() {
 
     timer_pageReset = current;
   }
-
 }

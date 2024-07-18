@@ -8,11 +8,11 @@ class Buzzer {
       tone(_pin, frequency, duration);
     }
 
-    void beep(uint8_t frequencyDegree, uint8_t toneDuration = 25) {
+    void beep(uint8_t frequencyDegree, uint8_t toneDuration = 25, bool invert = false) {
       unsigned int frequency = frequencyDegree * 50;
       tone(_pin, frequency, toneDuration);
       delay(toneDuration - 25);
-      tone(_pin, frequency + 50, toneDuration);
+      tone(_pin, frequency + (invert ? -50 : 50), toneDuration);
     }
 
     void playToneA() {

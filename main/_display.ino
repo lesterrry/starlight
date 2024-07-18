@@ -19,13 +19,18 @@ class Display {
       _display.print(text);
     }
 
+    void print(char character) {
+      _display.print(character);
+    }
+
     void render() {
       _display.display();
     }
 
-    void clear() {
+    void clear(bool shouldRender = true) {
       _display.clearDisplay();
-      render();
+
+      if (shouldRender) render();
     }
 
     void setTextSize(uint8_t size) {
@@ -40,6 +45,12 @@ class Display {
       _display.setCursor(x, y * 8);
     }
 
+    void printCornerChar(char character) {
+      setTextSize(1);
+      setCursor(rightmostPixelSize1, 0);
+      print(character);
+    }
+
     void renderTitle(String title, String subtitle = "") {
       _display.clearDisplay();
       
@@ -50,12 +61,22 @@ class Display {
       setTextSize(1);
       setCursor(0, 3);
       print(subtitle);
-
-      render();
     }
 
-    void renderLayout(Layout layout = List, String upperNote = "", String title = "", String subtitle = "", String lowerNote = "") {
-      _display.clearDisplay();
+    void printCursor(Layout forLayout = List, uint8_t position = 1) {
+      if (forLayout == List) {
+        setTextSize(1);
+        setCursor(rightmostPixelSize1, position);
+        print(cursorChar);
+      } else {
+        setTextSize(2);
+        setCursor(rightmostPixelSize2, position);
+        print(cursorChar);
+      }
+    }
+
+    void renderLayout(Layout layout = List, bool clear = true, String upperNote = "", String title = "", String subtitle = "", String lowerNote = "") {
+      if (clear) _display.clearDisplay();
 
       setTextSize(1);
       setCursor(0, 0);
@@ -88,4 +109,7 @@ class Display {
 
   private:
     Adafruit_SSD1306 _display;
+    uint16_t rightmostPixelSize1 = 120;
+    uint16_t rightmostPixelSize2 = 116;
+    char cursorChar = '<';
 };
