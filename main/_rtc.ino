@@ -4,7 +4,7 @@ class RTC {
       return _rtc.begin();
     }
 
-    void setTime(int8_t seconds, int8_t minutes, int8_t hours, int8_t day, int8_t month, int16_t year) {
+    void setTime(uint8_t seconds, uint8_t minutes, uint8_t hours, uint8_t day, uint8_t month, uint16_t year) {
       _rtc.setTime(seconds, minutes, hours, day, month, year);
     }
 
@@ -24,28 +24,16 @@ class RTC {
       return _rtc.getUnix(TIMEZONE);
     }
 
+    uint16_t minutesSinceMidnight() {
+      return _rtc.getHours() * 60 + _rtc.getMinutes();
+    }
+
+    String getTimeFromMsm(uint16_t msm) {
+      return _formatTime(msm / 60, msm % 60, 0, false);
+    }
+
     String getTime(bool withSeconds = false) {
-      String time = "";
-
-      int8_t hour = _rtc.getHours();
-      if (hour < 10) time += '0';
-      time += String(hour);
-
-      time += ':';
-
-      int8_t minute = _rtc.getMinutes();
-      if (minute < 10) time += '0';
-      time += String(minute);
-
-      if (withSeconds) {
-        time += ':';
-
-        int8_t second = _rtc.getSeconds();
-        if (second < 10) time += '0';
-        time += String(second);
-      }
-
-      return time;
+      return _formatTime(_rtc.getHours(), _rtc.getMinutes(), _rtc.getSeconds(), withSeconds);
     }
 
     String getDate() {
@@ -99,4 +87,25 @@ class RTC {
 
   private:
     MicroDS3231 _rtc;
+
+    String _formatTime(uint8_t hour, uint8_t minute, uint8_t second, bool withSeconds) {
+      String time = "";
+
+      if (hour < 10) time += '0';
+      time += String(hour);
+
+      time += ':';
+
+      if (minute < 10) time += '0';
+      time += String(minute);
+
+      if (withSeconds) {
+        time += ':';
+
+        if (second < 10) time += '0';
+        time += String(second);
+      }
+
+      return time;
+    }
 };

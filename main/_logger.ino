@@ -9,8 +9,8 @@ class Logger {
       if (_active) Serial.begin(_baud);
     }
 
-    template <typename Generic>
-    void print(Generic message) {
+    template <typename T>
+    void print(T message) {
       if (_active) Serial.println(message);
     }
 

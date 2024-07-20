@@ -5,14 +5,15 @@ Interactive time-sensitive relay
 me@aydar.media
 ******************************/
 
-#define DEBUG 1
+#define DEBUG 0
 #define SET_RTC_COMPILE_TIME 0
 
 #define VERSION "0.1.0"
 
-// #define DEBUG_TONES
-// #define DEBUG_MODULES
+#undef DEBUG_TONES
+#undef DEBUG_MODULES
 #define QUICK_BOOT
+#undef CLEAR_EEPROM
 #define FASTLED_INTERNAL
 
 #define RELAY_PIN      7
@@ -25,11 +26,13 @@ me@aydar.media
 #define ENC_CLK_PIN    45
 #define ENC_DT_PIN     47
 #define ENC_SW_PIN     49
+#define ENC_HOLD_DELAY 2500
 #define BUZZER_PIN     53
 #define LED_PIN        27
 #define LED_NUMBER     8
 #define LED_BRIGHTNESS 100
-#define TIMEZONE 3
+#define TIMEZONE       3
+#define MSM_IN_DAY     1430
 
 #include <microDS3231.h>
 #include <SPI.h>
@@ -38,3 +41,4 @@ me@aydar.media
 #include <Adafruit_SSD1306.h>
 #include <GyverEncoder.h>
 #include <FastLED.h>
+#include <EEPROM.h>

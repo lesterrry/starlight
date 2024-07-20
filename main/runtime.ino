@@ -9,80 +9,283 @@ LED led(LED_NUMBER, LED_BRIGHTNESS);
 
 uint32_t bootTime;
 Page currentPage = Home;
-Mode currentMode = Manual;
 bool pageSwitched = false;
 bool modeSwitched = false;
 bool homeWithTime = false;
 bool displaySleeping = false;
-bool cursorVisible = false;
+bool setupMode = false;
 bool knobDown = false;
 uint8_t cursorPosition = 0;
+uint8_t cursorLimit = 0;
+
+MemoryEntry mem_currentMode(64);
+MemoryEntry mem_scheduleOnTime(0);
+MemoryEntry mem_scheduleOffTime(2);
+MemoryEntry mem_d2dDuskOffset(4);
+MemoryEntry mem_d2dDawnOffset(6);
+MemoryEntry mem_sleepTimer(8);
+
+Mode currentMode = mem_currentMode.read();
+uint16_t scheduleOnTime = mem_scheduleOnTime.read();
+uint16_t scheduleOffTime = mem_scheduleOffTime.read();
+int16_t d2dDuskOffset = mem_d2dDuskOffset.read();
+int16_t d2dDawnOffset = mem_d2dDawnOffset.read();
+uint16_t sleepTimer = mem_sleepTimer.read();
 
 unsigned long timer_pageRender = 0;
 unsigned long timer_pageReset = 0;
 unsigned long counter_knobDown = 0;
 uint8_t counter_displaySleep = 0;
 
+void(* reset) (void) = 0;
+
+template <typename T>
+void adjustValue(T &value, int min, int max, bool decrement = false, int step = 10, bool inclusiveBoundary = false) {
+  if (decrement) {
+    int16_t adjusted = value - step;
+    bool overflow = inclusiveBoundary ? adjusted <= min : adjusted < min;
+    value = overflow ? max : adjusted;
+  } else {
+    int16_t adjusted = value + step;
+    bool overflow = inclusiveBoundary ? adjusted >= max : adjusted > max;
+    value = overflow ? min : adjusted;
+  }
+}
+
+void saveSettings() {
+  switch (currentPage) {
+    case ScheduleSettings: {
+      mem_scheduleOnTime.write(scheduleOnTime);
+      mem_scheduleOffTime.write(scheduleOffTime);
+      break;
+    }
+    case Dusk2DawnSettings: {
+      mem_d2dDuskOffset.write(d2dDuskOffset);
+      mem_d2dDawnOffset.write(d2dDawnOffset);
+      break;
+    }
+    case SleepTimerSettings: {
+      mem_sleepTimer.write(sleepTimer);
+      break;
+    }
+  }
+}
+
 void handleKnobRotation(bool direction, bool pressed = false) {
   logger.print("Current page: " + String(currentPage));
   if (displaySleeping) return;
 
   if (pressed) {
-    if (currentPage == Home) {
-      if (direction == Left) {
-        buzzer.beep(5);
-        currentMode = currentMode <= Manual ? SleepTimer : currentMode - 1;
-      } else {
-        buzzer.beep(6);
-        currentMode = currentMode >= SleepTimer ? Manual : currentMode + 1;
+    switch (currentPage) {
+      case Home: {
+        if (direction == Left) {
+          buzzer.beep(5);
+          adjustValue(currentMode, Manual, SleepTimer, true, 1);
+        } else {
+          buzzer.beep(6);
+          adjustValue(currentMode, Manual, SleepTimer, false, 1);
+        }
+        break;
       }
+      case ScheduleSettings: {
+        if (direction == Left) {
+          buzzer.beep(5);
+          if (cursorPosition == 0) {
+            adjustValue(scheduleOnTime, 0, MSM_IN_DAY, true, 10, false);
+          } else {
+            adjustValue(scheduleOffTime, 0, MSM_IN_DAY, true, 10, false);
+          }
+        } else {
+          buzzer.beep(6);
+          if (cursorPosition == 0) {
+            adjustValue(scheduleOnTime, 0, MSM_IN_DAY, false, 10, true);
+          } else {
+            adjustValue(scheduleOffTime, 0, MSM_IN_DAY, false, 10, true);
+          }
+        }
+      }
+      case Dusk2DawnSettings: {
+        if (direction == Left) {
+          buzzer.beep(5);
+          if (cursorPosition == 0) {
+            adjustValue(d2dDuskOffset, -60, 60, true, 1);
+          } else {
+            adjustValue(d2dDawnOffset, -60, 60, true, 1);
+          }
+        } else {
+          buzzer.beep(6);
+          if (cursorPosition == 0) {
+            adjustValue(d2dDuskOffset, -60, 60, false, 1);
+          } else {
+            adjustValue(d2dDawnOffset, -60, 60, false, 1);
+          }
+        }
+      }
+      case SleepTimerSettings: {
+        if (direction == Left) {
+          buzzer.beep(5);
+          adjustValue(sleepTimer, 10, 360, true, 10);
+        } else {
+          buzzer.beep(6);
+          adjustValue(sleepTimer, 10, 360, false, 10);
+        }
+      }
+    }
+  } else if (setupMode) {
+    if (direction == Left) {
+      buzzer.beep(5);
+      adjustValue(cursorPosition, 0, cursorLimit, true, 1);
+    } else {
+      buzzer.beep(6);
+      adjustValue(cursorPosition, 0, cursorLimit, false, 1);
     }
   } else {
     if (direction == Left) {
-      if (currentPage <= Info) return;
+      if (currentPage <= Version) return;
       currentPage = currentPage - 1;
     } else {
-      if (currentPage >= TimeSettings) return;
+      if (currentPage >= DateSettings) return;
       currentPage = currentPage + 1;
     }
   }
 }
 
 void handleKnobPress(bool pressed) {
-  if (pressed) {
-    cursorVisible = true;
-  } else {
-    cursorVisible = false;
+  if (currentPage == Home) {
+    if (pressed) {
+      setupMode = true;
+    } else {
+      setupMode = false;
+    }
   }
 }
 
 void handleKnobClick() {
+  logger.print(F("[Knob] click"));
   if (currentPage == Home) {
     toggleRelay();
+  } else if (currentPage > Home) {
+    if (!setupMode) {
+      buzzer.beep(6, 100);
+    } else {
+      buzzer.playToneB();
+      saveSettings();
+    }
+    cursorPosition = 0;
+    setupMode = !setupMode;
+  } else if (currentPage == Version) {
+    display.printTitle(F("REBOOTING"));
+    display.render();
+    delay(500);
+    reset();
   }
+}
+
+void handleRemoteClick() {
+  logger.print(F("[Radio] click"));
+  toggleRelay();
 }
 
 void renderPage(uint8_t page) {
   logger.print("Rendering page " + String(page));
   switch (page) {
+    case Version: {
+      String version = String(VERSION) + " (" + String(BUILD_DATE) + ")";
+      display.renderLayout(Display::List, true, PAGE_NAMES[page], "", "", version);
+      break;
+    }
     case Info: {
       String uptime = "UP: " + rtc.getUnixDelta(bootTime);
       String temp = "TEMP: " + String(rtc.getTemp());
-      String version = String(VERSION) + " (" + String(BUILD_DATE) + ")";
-      display.renderLayout(Display::List, true, PAGE_NAMES[page], uptime, temp, version);
+      String msm = "MSM: " + String(rtc.minutesSinceMidnight());
+      display.renderLayout(Display::List, true, PAGE_NAMES[page], uptime, temp, msm);
       break;
     }
     case Home: {
+      String title = homeWithTime ? rtc.getTime(true) : PAGE_NAMES[page];
       display.clear(false);
       printRelayStatus();
-      if (cursorVisible) display.printCursor(Display::ListWithBigTitle);
-      display.renderLayout(Display::ListWithBigTitle, false, homeWithTime ? rtc.getTime(true) : PAGE_NAMES[page], MODE_NAMES[currentMode]);
+      if (setupMode) display.printCursor(Display::ListWithBigTitle);
+      display.renderLayout(Display::ListWithBigTitle, false, title, MODE_NAMES[currentMode]);
       break;
     }
     case ScheduleSettings: {
-      String on = "ON:  ";
-      String off = "OFF: ";
-      display.renderLayout(Display::List, true, PAGE_NAMES[page], on, off);
+      cursorLimit = 1;
+      String on = "ON:  " + rtc.getTimeFromMsm(scheduleOnTime);
+      String off = "OFF: " + rtc.getTimeFromMsm(scheduleOffTime);
+      String title = PAGE_NAMES[page];
+      if (setupMode) {
+        title += SETUP_MODE_MARKER;
+        display.clear(false);
+        display.printCursor(Display::List, cursorPosition);
+      }
+      display.renderLayout(Display::List, !setupMode, title, on, off);
+      break;
+    }
+    case Dusk2DawnSettings: {
+      cursorLimit = 1;
+      String duskOffset = "Dusk Offset: " + String(d2dDuskOffset);
+      String dawnOffset = "Dawn Offset: " + String(d2dDawnOffset);
+      String title = PAGE_NAMES[page];
+      if (setupMode) {
+        title += SETUP_MODE_MARKER;
+        display.clear(false);
+        display.printCursor(Display::List, cursorPosition);
+      }
+      display.renderLayout(Display::List, !setupMode, title, duskOffset, dawnOffset);
+      break;
+    }
+    case SleepTimerSettings: {
+      cursorLimit = 0;
+      String timer = "Timer: " + String(sleepTimer);
+      String title = PAGE_NAMES[page];
+      if (setupMode) {
+        title += SETUP_MODE_MARKER;
+        display.clear(false);
+        display.printCursor(Display::List, cursorPosition);
+      }
+      display.renderLayout(Display::List, !setupMode, title, timer);
+      break;
+    }
+    case AdditionalSettings: {
+      cursorLimit = 2;
+      String remote = "Remote: ";
+      String displaySleep = "Display Sleep: ";
+      String beep = "Sound: ";
+      String title = PAGE_NAMES[page];
+      if (setupMode) {
+        title += SETUP_MODE_MARKER;
+        display.clear(false);
+        display.printCursor(Display::List, cursorPosition);
+      }
+      display.renderLayout(Display::List, !setupMode, title, remote, displaySleep, beep);
+      break;
+    }
+    case TimeSettings: {
+      cursorLimit = 1;
+      String hour = "H: ";
+      String minute = "M: ";
+      String title = PAGE_NAMES[page];
+      if (setupMode) {
+        title += SETUP_MODE_MARKER;
+        display.clear(false);
+        display.printCursor(Display::List, cursorPosition);
+      }
+      display.renderLayout(Display::List, !setupMode, title, hour, minute);
+      break;
+    }
+    case DateSettings: {
+      cursorLimit = 1;
+      String day = "D: ";
+      String month = "M: ";
+      String year = "Y: ";
+      String title = PAGE_NAMES[page];
+      if (setupMode) {
+        title += SETUP_MODE_MARKER;
+        display.clear(false);
+        display.printCursor(Display::List, cursorPosition);
+      }
+      display.renderLayout(Display::List, !setupMode, title, day, month, year);
       break;
     }
     default: {
@@ -110,6 +313,8 @@ void setup() {
   logger.print(F("Sunset initializing..."));
   logger.print(VERSION);
 
+  led.off();
+
   if (!rtc.isConnected()) {
     logger.print(F("[RTC] Not connected"));
   } else {
@@ -126,11 +331,16 @@ void setup() {
 
   display.begin();
 
+  #ifdef CLEAR_EEPROM
+    mem_currentMode.write(0);
+    mem_scheduleOnTime.write(0);
+    mem_scheduleOffTime.write(0);
+  #endif
   #ifndef QUICK_BOOT
-    display.renderTitle(F("SUBURBS:"), F("SUNSET"));
+    display.printTitle(F("SUBURBS:"), F("SUNSET"));
     buzzer.playToneB();
     delay(2000);
-    display.renderTitle("", String(VERSION) + "      " + String(BUILD_DATE));
+    display.printTitle("", String(VERSION) + "      " + String(BUILD_DATE));
     delay(1000);
     display.clear();
   #endif
@@ -145,7 +355,7 @@ void setup() {
 	#endif
   #ifdef DEBUG_MODULES
     led.light(CRGB::Purple);
-    display.renderTitle("DEBUG");
+    display.printTitle("DEBUG");
     logger.print("Relay switching on...");
     relay.on();
     delay(1000);
@@ -171,9 +381,9 @@ void setup() {
 
   renderPage(currentPage);
 
-  knob.reset();
-
   logger.print(F("Entering loop..."));
+  
+  knob.reset();
 }
 
 void loop() {
@@ -183,6 +393,10 @@ void loop() {
 
   pageSwitched = false;
   modeSwitched = false;
+
+  if (radio.isReceiving()) {
+    handleRemoteClick();
+  }
 
   if (knob.isRight()) {
     buzzer.beep(4);
@@ -197,7 +411,7 @@ void loop() {
     modeSwitched = true;
   } else if (knob.isDown()) {
     counter_knobDown++;
-    if (counter_knobDown > 1750) {
+    if (counter_knobDown > ENC_HOLD_DELAY) {
       if (knob.isRight(true)) {
         handleKnobRotation(Right, true);
         modeSwitched = true;
@@ -216,6 +430,7 @@ void loop() {
     knobDown = false;
     modeSwitched = true;
     counter_knobDown = 0;
+    if (mem_currentMode.read() != currentMode) mem_currentMode.write(currentMode);
   } else {
     counter_knobDown = 0;
   }
@@ -248,11 +463,15 @@ void loop() {
       counter_displaySleep++;
       displaySleeping = false;
     } else {
+      saveSettings();
       display.clear();
       displaySleeping = true;
+      setupMode = false;
     }
 
     if (currentPage != Home) {
+      saveSettings();
+      setupMode = false;
       currentPage = Home;
       renderPage(currentPage);
     }
