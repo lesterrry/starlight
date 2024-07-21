@@ -15,8 +15,15 @@ bool homeWithTime = false;
 bool displaySleeping = false;
 bool setupMode = false;
 bool knobDown = false;
+bool earlyClick = true;  // hack to disable false clicks on startup
 uint8_t cursorPosition = 0;
 uint8_t cursorLimit = 0;
+
+uint8_t localMinutes;
+uint8_t localHours;
+uint8_t localDay;
+uint8_t localMonth;
+uint16_t localYear;
 
 MemoryEntry mem_currentMode(64);
 MemoryEntry mem_scheduleOnTime(0);
@@ -24,6 +31,9 @@ MemoryEntry mem_scheduleOffTime(2);
 MemoryEntry mem_d2dDuskOffset(4);
 MemoryEntry mem_d2dDawnOffset(6);
 MemoryEntry mem_sleepTimer(8);
+MemoryEntry mem_remoteEnabled(10);
+MemoryEntry mem_displaySleepEnabled(12);
+MemoryEntry mem_soundEnabled(14);
 
 Mode currentMode = mem_currentMode.read();
 uint16_t scheduleOnTime = mem_scheduleOnTime.read();
@@ -31,6 +41,9 @@ uint16_t scheduleOffTime = mem_scheduleOffTime.read();
 int16_t d2dDuskOffset = mem_d2dDuskOffset.read();
 int16_t d2dDawnOffset = mem_d2dDawnOffset.read();
 uint16_t sleepTimer = mem_sleepTimer.read();
+uint16_t remoteEnabled = mem_remoteEnabled.read();
+uint16_t displaySleepEnabled = mem_displaySleepEnabled.read();
+uint16_t soundEnabled = mem_soundEnabled.read();
 
 unsigned long timer_pageRender = 0;
 unsigned long timer_pageReset = 0;
@@ -52,6 +65,15 @@ void adjustValue(T &value, int min, int max, bool decrement = false, int step = 
   }
 }
 
+void setLocalTime() {
+  localMinutes = rtc.getMinutes();
+  localHours = rtc.getHours();
+  localDay = rtc.getDay();
+  localMonth = rtc.getMonth();
+  localYear = rtc.getYear();
+  bootTime = rtc.unix();
+}
+
 void saveSettings() {
   switch (currentPage) {
     case ScheduleSettings: {
@@ -66,6 +88,18 @@ void saveSettings() {
     }
     case SleepTimerSettings: {
       mem_sleepTimer.write(sleepTimer);
+      break;
+    }
+    case AdditionalSettings: {
+      mem_remoteEnabled.write(remoteEnabled);
+      mem_displaySleepEnabled.write(displaySleepEnabled);
+      mem_soundEnabled.write(soundEnabled);
+      break;
+    }
+    case TimeSettings:
+    case DateSettings: {
+      rtc.setTime(0, localMinutes, localHours, localDay, localMonth, localYear);
+      setLocalTime();
       break;
     }
   }
@@ -94,6 +128,18 @@ void handleKnobRotation(bool direction, bool pressed = false) {
         adjustValue(sleepTimer, 10, 360, direction == Left, 10);
         break;
       }
+      case AdditionalSettings: {
+        adjustValue(cursorPosition == 0 ? remoteEnabled : (cursorPosition == 1 ? displaySleepEnabled : soundEnabled), 0, cursorPosition == 1 ? 2 : 1, direction == Left, 1);
+        break;
+      }
+      case TimeSettings: {
+        adjustValue(cursorPosition == 0 ? localHours : localMinutes, 0, cursorPosition == 1 ? 59 : 23, direction == Left, 1);
+        break;
+      }
+      case DateSettings: {
+        adjustValue(cursorPosition == 0 ? (uint16_t&)localDay : (cursorPosition == 1 ? (uint16_t&)localMonth : localYear), cursorPosition == 2 ? 2000 : 1, cursorPosition == 0 ? 30 : (cursorPosition == 1 ? 12 : 2100), direction == Left, 1);
+        break;
+      }
     }
   } else if (setupMode) {
     adjustValue(cursorPosition, 0, cursorLimit, direction == Left, 1);
@@ -119,6 +165,11 @@ void handleKnobPress(bool pressed) {
 }
 
 void handleKnobClick() {
+  if (earlyClick) {
+    logger.print(F("[Knob] early click"));
+    earlyClick = true;
+    return;
+  }
   logger.print(F("[Knob] click"));
   if (currentPage == Home) {
     toggleRelay();
@@ -155,8 +206,8 @@ void renderPage(uint8_t page) {
     case Info: {
       String uptime = "UP: " + rtc.getUnixDelta(bootTime);
       String temp = "TEMP: " + String(rtc.getTemp());
-      String msm = "MSM: " + String(rtc.minutesSinceMidnight());
-      display.renderLayout(Display::List, true, PAGE_NAMES[page], uptime, temp, msm);
+      String date = "DATE: " + String(rtc.getDate(true));
+      display.renderLayout(Display::List, true, PAGE_NAMES[page], uptime, temp, date);
       break;
     }
     case Home: {
@@ -182,8 +233,8 @@ void renderPage(uint8_t page) {
     }
     case Dusk2DawnSettings: {
       cursorLimit = 1;
-      String duskOffset = "Dusk Offset: " + String(d2dDuskOffset);
-      String dawnOffset = "Dawn Offset: " + String(d2dDawnOffset);
+      String duskOffset = "DUSK OFFSET: " + String(d2dDuskOffset);
+      String dawnOffset = "DAWN OFFSET: " + String(d2dDawnOffset);
       String title = PAGE_NAMES[page];
       if (setupMode) {
         title += SETUP_MODE_MARKER;
@@ -195,7 +246,7 @@ void renderPage(uint8_t page) {
     }
     case SleepTimerSettings: {
       cursorLimit = 0;
-      String timer = "Timer: " + String(sleepTimer);
+      String timer = "TIMER: " + String(sleepTimer);
       String title = PAGE_NAMES[page];
       if (setupMode) {
         title += SETUP_MODE_MARKER;
@@ -207,22 +258,22 @@ void renderPage(uint8_t page) {
     }
     case AdditionalSettings: {
       cursorLimit = 2;
-      String remote = "Remote: ";
-      String displaySleep = "Display Sleep: ";
-      String beep = "Sound: ";
+      String remote = "REMOTE: " + String(ON_OFF_NAMES[remoteEnabled]);
+      String displaySleep = "SCREEN SLEEP: " + String(ON_OFF_NAMES[displaySleepEnabled]);
+      String sound = "SOUND: " + String(ON_OFF_NAMES[soundEnabled]);
       String title = PAGE_NAMES[page];
       if (setupMode) {
         title += SETUP_MODE_MARKER;
         display.clear(false);
         display.printCursor(Display::List, cursorPosition);
       }
-      display.renderLayout(Display::List, !setupMode, title, remote, displaySleep, beep);
+      display.renderLayout(Display::List, !setupMode, title, remote, displaySleep, sound);
       break;
     }
     case TimeSettings: {
       cursorLimit = 1;
-      String hour = "H: ";
-      String minute = "M: ";
+      String hour = "H: " + String(localHours);
+      String minute = "M: " + String(localMinutes);
       String title = PAGE_NAMES[page];
       if (setupMode) {
         title += SETUP_MODE_MARKER;
@@ -233,10 +284,10 @@ void renderPage(uint8_t page) {
       break;
     }
     case DateSettings: {
-      cursorLimit = 1;
-      String day = "D: ";
-      String month = "M: ";
-      String year = "Y: ";
+      cursorLimit = 2;
+      String day = "D: " + String(localDay);
+      String month = "M: " + String(localMonth);
+      String year = "Y: " + String(localYear);
       String title = PAGE_NAMES[page];
       if (setupMode) {
         title += SETUP_MODE_MARKER;
@@ -278,11 +329,14 @@ void setup() {
   } else {
     if (SET_RTC_COMPILE_TIME) {
       logger.print(F("[RTC] Setting compile time..."));
+      logger.print(String(BUILD_SEC) + " " + String(BUILD_MIN) + " " + String(BUILD_HOUR) + " " + String(BUILD_DAY) + " " + String(BUILD_MONTH) + " " + String(BUILD_YEAR));
       rtc.setCompileTime();
     }
 
     logger.print("[RTC] time: '" + rtc.getTime() + "'");
     logger.print("[RTC] date: '" + rtc.getDate() + "'");
+
+    setLocalTime();
 
     bootTime = rtc.unix();
   }
@@ -293,6 +347,12 @@ void setup() {
     mem_currentMode.write(0);
     mem_scheduleOnTime.write(0);
     mem_scheduleOffTime.write(0);
+    mem_d2dDuskOffset.write(0);
+    mem_d2dDawnOffset.write(0);
+    mem_sleepTimer.write(0);
+    mem_remoteEnabled.write(0);
+    mem_displaySleepEnabled.write(0);
+    mem_soundEnabled.write(0);
   #endif
   #ifndef QUICK_BOOT
     display.printTitle(F("SUBURBS:"), F("SUNSET"));
@@ -413,6 +473,7 @@ void loop() {
 
     if(needsRerender) renderPage(currentPage);
 
+    earlyClick = false;
     timer_pageRender = current;
   }
 

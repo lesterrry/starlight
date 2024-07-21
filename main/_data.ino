@@ -26,6 +26,8 @@ const char* PAGE_NAMES[] = {"VERSION", "INFO", "HOME", "SCHEDULE", "D2D", "SLEEP
 
 const char* MODE_NAMES[] = {"MANUAL", "SCHEDULE", "D2D", "SLEEP"};
 
+const char* ON_OFF_NAMES[] = {"On", "Off", "Relay"};
+
 const String BUILD_DATE = (BUILD_DAY > 9 ? "" : "0") + String(BUILD_DAY) + "." + (BUILD_MONTH > 9 ? "" : "0") + String(BUILD_MONTH) + "." + String(BUILD_YEAR);
 
 const char SETUP_MODE_MARKER = ':';

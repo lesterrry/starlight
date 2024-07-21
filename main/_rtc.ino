@@ -12,6 +12,30 @@ class RTC {
       setTime(BUILD_SEC, BUILD_MIN, BUILD_HOUR, BUILD_DAY, BUILD_MONTH, BUILD_YEAR);
     }
 
+    uint8_t getSeconds() {
+      return _rtc.getSeconds();
+    }
+
+    uint8_t getMinutes() {
+      return _rtc.getMinutes();
+    }
+
+    uint8_t getHours() {
+      return _rtc.getHours();
+    }
+    
+    uint8_t getDay() {
+      return _rtc.getDate();
+    }
+
+    uint8_t getMonth() {
+      return _rtc.getMonth();
+    }
+
+    uint16_t getYear() {
+      return _rtc.getYear();
+    }
+
     float getTemp() {
       return _rtc.getTemperatureFloat();
     }
@@ -33,23 +57,11 @@ class RTC {
     }
 
     String getTime(bool withSeconds = false) {
-      return _formatTime(_rtc.getHours(), _rtc.getMinutes(), _rtc.getSeconds(), withSeconds);
+      return _formatTime(getHours(), getMinutes(), getSeconds(), withSeconds);
     }
 
-    String getDate() {
-      String date = "";
-
-      int8_t day = _rtc.getDate();
-      if (day < 10) date += '0';
-      date += String(day);
-
-      date += '.';
-
-      int8_t month = _rtc.getMonth();
-      if (month < 10) date += '0';
-      date += String(month);
-
-      return date;
+    String getDate(bool withYear = false) {
+      return _formatDate(getDay(), getMonth(), getYear(), withYear);
     }
 
     String getUnixDelta(uint32_t pastTime) {
@@ -107,5 +119,25 @@ class RTC {
       }
 
       return time;
+    }
+
+    String _formatDate(uint8_t day, uint8_t month, uint16_t year, bool withYear) {
+      String date = "";
+
+      if (day < 10) date += '0';
+      date += String(day);
+
+      date += '.';
+
+      if (month < 10) date += '0';
+      date += String(month);
+
+      if (withYear) {
+        date += '.';
+        
+        date += String(year);
+      }
+
+      return date;
     }
 };
