@@ -76,69 +76,27 @@ void handleKnobRotation(bool direction, bool pressed = false) {
   if (displaySleeping) return;
 
   if (pressed) {
+    buzzer.beep(6);
     switch (currentPage) {
       case Home: {
-        if (direction == Left) {
-          buzzer.beep(5);
-          adjustValue(currentMode, Manual, SleepTimer, true, 1);
-        } else {
-          buzzer.beep(6);
-          adjustValue(currentMode, Manual, SleepTimer, false, 1);
-        }
+        adjustValue(currentMode, Manual, SleepTimer, direction == Left, 1);
         break;
       }
       case ScheduleSettings: {
-        if (direction == Left) {
-          buzzer.beep(5);
-          if (cursorPosition == 0) {
-            adjustValue(scheduleOnTime, 0, MSM_IN_DAY, true, 10, false);
-          } else {
-            adjustValue(scheduleOffTime, 0, MSM_IN_DAY, true, 10, false);
-          }
-        } else {
-          buzzer.beep(6);
-          if (cursorPosition == 0) {
-            adjustValue(scheduleOnTime, 0, MSM_IN_DAY, false, 10, true);
-          } else {
-            adjustValue(scheduleOffTime, 0, MSM_IN_DAY, false, 10, true);
-          }
-        }
+        adjustValue(cursorPosition == 0 ? scheduleOnTime : scheduleOffTime, 0, 1430, direction == Left, 10, direction != Left);
+        break;
       }
       case Dusk2DawnSettings: {
-        if (direction == Left) {
-          buzzer.beep(5);
-          if (cursorPosition == 0) {
-            adjustValue(d2dDuskOffset, -60, 60, true, 1);
-          } else {
-            adjustValue(d2dDawnOffset, -60, 60, true, 1);
-          }
-        } else {
-          buzzer.beep(6);
-          if (cursorPosition == 0) {
-            adjustValue(d2dDuskOffset, -60, 60, false, 1);
-          } else {
-            adjustValue(d2dDawnOffset, -60, 60, false, 1);
-          }
-        }
+        adjustValue(cursorPosition == 0 ? d2dDuskOffset : d2dDawnOffset, -60, 60, direction == Left, 1);
+        break;
       }
       case SleepTimerSettings: {
-        if (direction == Left) {
-          buzzer.beep(5);
-          adjustValue(sleepTimer, 10, 360, true, 10);
-        } else {
-          buzzer.beep(6);
-          adjustValue(sleepTimer, 10, 360, false, 10);
-        }
+        adjustValue(sleepTimer, 10, 360, direction == Left, 10);
+        break;
       }
     }
   } else if (setupMode) {
-    if (direction == Left) {
-      buzzer.beep(5);
-      adjustValue(cursorPosition, 0, cursorLimit, true, 1);
-    } else {
-      buzzer.beep(6);
-      adjustValue(cursorPosition, 0, cursorLimit, false, 1);
-    }
+    adjustValue(cursorPosition, 0, cursorLimit, direction == Left, 1);
   } else {
     if (direction == Left) {
       if (currentPage <= Version) return;

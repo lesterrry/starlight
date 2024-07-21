@@ -32,7 +32,6 @@ me@aydar.media
 #define LED_NUMBER     8
 #define LED_BRIGHTNESS 100
 #define TIMEZONE       3
-#define MSM_IN_DAY     1430
 
 #include <microDS3231.h>
 #include <SPI.h>
