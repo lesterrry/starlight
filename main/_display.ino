@@ -101,7 +101,7 @@ class Display {
 
         setTextSize(1);
         setCursor(0, 3);
-        print(lowerNote);
+        print(subtitle);
       }
 
       render();

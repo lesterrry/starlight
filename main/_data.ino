@@ -22,6 +22,17 @@ enum Direction {
   Right
 };
 
+enum RelayCommand {
+  None,
+  TurnOn,
+  TurnOff
+};
+
+struct UpcomingCommand {
+  RelayCommand command;
+  uint16_t msm;
+};
+
 const char* PAGE_NAMES[] = {"VERSION", "INFO", "HOME", "SCHEDULE", "D2D", "SLEEP", "SETTINGS", "TIME", "DATE"};
 
 const char* MODE_NAMES[] = {"MANUAL", "SCHEDULE", "D2D", "SLEEP"};

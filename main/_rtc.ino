@@ -97,6 +97,21 @@ class RTC {
       return timeString;
     }
 
+    String msmToString(uint16_t minutes) {
+      String timeString;
+
+      int hours = minutes / 60;
+      minutes = minutes % 60;
+
+      if (hours > 0) {
+        timeString += String(hours) + "h ";
+      }
+      
+      timeString += String(minutes) + "m ";
+
+      return timeString;
+    }
+
   private:
     MicroDS3231 _rtc;
 

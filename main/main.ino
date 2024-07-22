@@ -31,6 +31,8 @@ me@aydar.media
 #define LED_PIN        27
 #define LED_NUMBER     8
 #define LED_BRIGHTNESS 100
+#define LONGITUDE      56.237472
+#define LATITUDE       36.841194
 #define TIMEZONE       3
 
 #include <microDS3231.h>
@@ -40,4 +42,5 @@ me@aydar.media
 #include <Adafruit_SSD1306.h>
 #include <GyverEncoder.h>
 #include <FastLED.h>
+#include <Dusk2Dawn.h>
 #include <EEPROM.h>

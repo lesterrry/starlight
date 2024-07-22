@@ -18,6 +18,7 @@ bool knobDown = false;
 bool earlyClick = true;  // hack to disable false clicks on startup
 uint8_t cursorPosition = 0;
 uint8_t cursorLimit = 0;
+RelayCommand manualOverrideCommand = None;
 
 uint8_t localMinutes;
 uint8_t localHours;
@@ -75,6 +76,7 @@ void setLocalTime() {
 }
 
 void saveSettings() {
+  logger.print(F("Saving settings..."));
   switch (currentPage) {
     case ScheduleSettings: {
       mem_scheduleOnTime.write(scheduleOnTime);
@@ -173,6 +175,7 @@ void handleKnobClick() {
   logger.print(F("[Knob] click"));
   if (currentPage == Home) {
     toggleRelay();
+    manualOverrideCommand = relay.getState() ? TurnOn : TurnOff;
   } else if (currentPage > Home) {
     if (!setupMode) {
       buzzer.beep(6, 100);
@@ -212,10 +215,11 @@ void renderPage(uint8_t page) {
     }
     case Home: {
       String title = homeWithTime ? rtc.getTime(true) : PAGE_NAMES[page];
+      String upcoming = getUpcomingCommandText();
       display.clear(false);
       printRelayStatus();
       if (setupMode) display.printCursor(Display::ListWithBigTitle);
-      display.renderLayout(Display::ListWithBigTitle, false, title, MODE_NAMES[currentMode]);
+      display.renderLayout(Display::ListWithBigTitle, false, title, MODE_NAMES[currentMode], upcoming);
       break;
     }
     case ScheduleSettings: {
@@ -315,6 +319,47 @@ void toggleRelay() {
   led.toggle();
   relay.toggle();
   buzzer.beep(6, 100, !relay.getState());
+}
+
+void runRelayCommand(uint8_t command) {
+  if (command == TurnOn) {
+    relay.on();
+    led.on();
+    manualOverrideCommand = None;
+  } else if (command == TurnOff) {
+    relay.off();
+    led.off();
+    manualOverrideCommand = None;
+  }
+}
+
+void resolveRelayCommand(uint8_t automaticCommand) {
+  if (manualOverrideCommand == None) {
+    runRelayCommand(automaticCommand);
+  } else if (manualOverrideCommand == automaticCommand || automaticCommand == None) {
+    manualOverrideCommand = None;
+  }
+}
+
+String getUpcomingCommandText() {
+  uint16_t currentMsm = rtc.minutesSinceMidnight();
+  String result = "";
+
+  switch (currentMode) {
+    case Schedule: {
+      UpcomingCommand upcomingCommand = Schedule::getUpcomingCommand(currentMsm, scheduleOnTime, scheduleOffTime, relay.getState());
+      if (upcomingCommand.command == TurnOn) {
+        result += "On in ";
+        result += rtc.msmToString(upcomingCommand.msm);
+      } else {
+        result += "Off in ";
+        result += rtc.msmToString(upcomingCommand.msm);
+      }
+      break;
+    }
+  }
+
+  return result;
 }
 
 void setup() {
@@ -478,10 +523,21 @@ void loop() {
   }
 
   if (current - timer_pageReset >= 10000) {
+    uint16_t currentMsm = rtc.minutesSinceMidnight();
+
+    switch (currentMode) {
+      case Schedule: {
+        RelayCommand scheduleCommand = Schedule::getCommand(currentMsm, scheduleOnTime, scheduleOffTime, relay.getState());
+        // logger.print(scheduleCommand);
+        resolveRelayCommand(scheduleCommand);
+        break;
+      }
+    }
+
     if (counter_displaySleep < 2) {
       counter_displaySleep++;
       displaySleeping = false;
-    } else {
+    } else if (!displaySleeping) {
       saveSettings();
       display.clear();
       displaySleeping = true;
