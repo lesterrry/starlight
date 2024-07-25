@@ -97,11 +97,13 @@ class RTC {
       return timeString;
     }
 
-    String msmToString(uint16_t minutes) {
+    String msmToString(uint16_t minutes, bool asPeriod = true) {
       String timeString;
 
       int hours = minutes / 60;
       minutes = minutes % 60;
+
+      if (!asPeriod) return _formatTime(hours, minutes, 0, false);
 
       if (hours > 0) {
         timeString += String(hours) + "h ";

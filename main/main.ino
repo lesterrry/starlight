@@ -12,6 +12,7 @@ me@aydar.media
 
 #undef DEBUG_TONES
 #undef DEBUG_MODULES
+#undef DEBUG_D2D
 #define QUICK_BOOT
 #undef CLEAR_EEPROM
 #define FASTLED_INTERNAL

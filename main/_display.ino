@@ -51,7 +51,7 @@ class Display {
       print(character);
     }
 
-    void printTitle(String title, String subtitle = "") {
+    void renderTitle(String title, String subtitle = "") {
       _display.clearDisplay();
       
       setTextSize(2);
@@ -61,6 +61,8 @@ class Display {
       setTextSize(1);
       setCursor(0, 3);
       print(subtitle);
+
+      render();
     }
 
     void printCursor(Layout forLayout = List, uint8_t position = 0) {

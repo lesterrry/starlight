@@ -3,7 +3,7 @@ enum Page {
   Info,
   Home,
   ScheduleSettings,
-  Dusk2DawnSettings,
+  DuskToDawnSettings,
   SleepTimerSettings,
   AdditionalSettings,
   TimeSettings,
@@ -13,7 +13,7 @@ enum Page {
 enum Mode {
   Manual,
   Schedule,
-  Dusk2Dawn,
+  DuskToDawn,
   SleepTimer
 };
 
@@ -31,6 +31,11 @@ enum RelayCommand {
 struct UpcomingCommand {
   RelayCommand command;
   uint16_t msm;
+};
+
+struct SolarTime {
+  uint16_t sunriseMsm;
+  uint16_t sunsetMsm;
 };
 
 const char* PAGE_NAMES[] = {"VERSION", "INFO", "HOME", "SCHEDULE", "D2D", "SLEEP", "SETTINGS", "TIME", "DATE"};

@@ -6,6 +6,7 @@ Display display(OLED_MOSI_PIN, OLED_CLK_PIN, OLED_DC_PIN, OLED_RESET_PIN, OLED_C
 Knob knob(ENC_CLK_PIN, ENC_DT_PIN, ENC_SW_PIN);
 Buzzer buzzer(BUZZER_PIN);
 LED led(LED_NUMBER, LED_BRIGHTNESS);
+D2D d2d(LONGITUDE, LATITUDE, TIMEZONE);
 
 uint32_t bootTime;
 Page currentPage = Home;
@@ -19,6 +20,7 @@ bool earlyClick = true;  // hack to disable false clicks on startup
 uint8_t cursorPosition = 0;
 uint8_t cursorLimit = 0;
 RelayCommand manualOverrideCommand = None;
+SolarTime currentSolarTime;
 
 uint8_t localMinutes;
 uint8_t localHours;
@@ -75,6 +77,10 @@ void setLocalTime() {
   bootTime = rtc.unix();
 }
 
+void setSolarTime() {
+  currentSolarTime = d2d.getSolarTime(25, 7, 2024, d2dDuskOffset, d2dDawnOffset);
+}
+
 void saveSettings() {
   logger.print(F("Saving settings..."));
   switch (currentPage) {
@@ -83,9 +89,10 @@ void saveSettings() {
       mem_scheduleOffTime.write(scheduleOffTime);
       break;
     }
-    case Dusk2DawnSettings: {
+    case DuskToDawnSettings: {
       mem_d2dDuskOffset.write(d2dDuskOffset);
       mem_d2dDawnOffset.write(d2dDawnOffset);
+      setSolarTime();
       break;
     }
     case SleepTimerSettings: {
@@ -122,8 +129,8 @@ void handleKnobRotation(bool direction, bool pressed = false) {
         adjustValue(cursorPosition == 0 ? scheduleOnTime : scheduleOffTime, 0, 1430, direction == Left, 10, direction != Left);
         break;
       }
-      case Dusk2DawnSettings: {
-        adjustValue(cursorPosition == 0 ? d2dDuskOffset : d2dDawnOffset, -60, 60, direction == Left, 1);
+      case DuskToDawnSettings: {
+        adjustValue(cursorPosition == 0 ? d2dDuskOffset : d2dDawnOffset, -60, 60, direction == Left, 5);
         break;
       }
       case SleepTimerSettings: {
@@ -186,8 +193,7 @@ void handleKnobClick() {
     cursorPosition = 0;
     setupMode = !setupMode;
   } else if (currentPage == Version) {
-    display.printTitle(F("REBOOTING"));
-    display.render();
+    display.renderTitle(F("REBOOTING"));
     delay(500);
     reset();
   }
@@ -235,17 +241,19 @@ void renderPage(uint8_t page) {
       display.renderLayout(Display::List, !setupMode, title, on, off);
       break;
     }
-    case Dusk2DawnSettings: {
+    case DuskToDawnSettings: {
+      setSolarTime();
       cursorLimit = 1;
       String duskOffset = "DUSK OFFSET: " + String(d2dDuskOffset);
       String dawnOffset = "DAWN OFFSET: " + String(d2dDawnOffset);
+      String solarTime = rtc.msmToString(currentSolarTime.sunsetMsm, false) + " / " + rtc.msmToString(currentSolarTime.sunriseMsm, false);
       String title = PAGE_NAMES[page];
       if (setupMode) {
         title += SETUP_MODE_MARKER;
         display.clear(false);
         display.printCursor(Display::List, cursorPosition);
       }
-      display.renderLayout(Display::List, !setupMode, title, duskOffset, dawnOffset);
+      display.renderLayout(Display::List, !setupMode, title, duskOffset, dawnOffset, solarTime);
       break;
     }
     case SleepTimerSettings: {
@@ -341,22 +349,49 @@ void resolveRelayCommand(uint8_t automaticCommand) {
   }
 }
 
-String getUpcomingCommandText() {
+void runAutoCommands() {
   uint16_t currentMsm = rtc.minutesSinceMidnight();
-  String result = "";
+  RelayCommand command;
 
   switch (currentMode) {
     case Schedule: {
-      UpcomingCommand upcomingCommand = Schedule::getUpcomingCommand(currentMsm, scheduleOnTime, scheduleOffTime, relay.getState());
-      if (upcomingCommand.command == TurnOn) {
-        result += "On in ";
-        result += rtc.msmToString(upcomingCommand.msm);
-      } else {
-        result += "Off in ";
-        result += rtc.msmToString(upcomingCommand.msm);
-      }
+      command = Schedule::getCommand(currentMsm, scheduleOnTime, scheduleOffTime, relay.getState());
       break;
     }
+    case DuskToDawn: {
+      command = Schedule::getCommand(currentMsm, currentSolarTime.sunsetMsm, currentSolarTime.sunriseMsm, relay.getState());
+      break;
+    }
+  }
+
+  resolveRelayCommand(command);
+}
+
+String getUpcomingCommandText() {
+  uint16_t currentMsm = rtc.minutesSinceMidnight();
+  String result = "";
+  UpcomingCommand upcomingCommand;
+  upcomingCommand.command = None;
+
+  switch (currentMode) {
+    case Schedule: {
+      upcomingCommand = Schedule::getUpcomingCommand(currentMsm, scheduleOnTime, scheduleOffTime, relay.getState());
+      logger.print(String(scheduleOnTime) + " -> " + String(scheduleOffTime));
+      break;
+    }
+    case DuskToDawn: {
+      upcomingCommand = Schedule::getUpcomingCommand(currentMsm, currentSolarTime.sunsetMsm, currentSolarTime.sunriseMsm, relay.getState());
+      logger.print(String(currentSolarTime.sunsetMsm) + " -> " + String(currentSolarTime.sunriseMsm));
+      break;
+    }
+  }
+
+  if (upcomingCommand.command == TurnOn) {
+    result += "On in ";
+    result += rtc.msmToString(upcomingCommand.msm);
+  } else if (upcomingCommand.command == TurnOff) {
+    result += "Off in ";
+    result += rtc.msmToString(upcomingCommand.msm);
   }
 
   return result;
@@ -382,6 +417,7 @@ void setup() {
     logger.print("[RTC] date: '" + rtc.getDate() + "'");
 
     setLocalTime();
+    setSolarTime();
 
     bootTime = rtc.unix();
   }
@@ -400,10 +436,10 @@ void setup() {
     mem_soundEnabled.write(0);
   #endif
   #ifndef QUICK_BOOT
-    display.printTitle(F("SUBURBS:"), F("SUNSET"));
+    display.renderTitle(F("SUBURBS:"), F("SUNSET"));
     buzzer.playToneB();
     delay(2000);
-    display.printTitle("", String(VERSION) + "      " + String(BUILD_DATE));
+    display.renderTitle("", String(VERSION) + "      " + String(BUILD_DATE));
     delay(1000);
     display.clear();
   #endif
@@ -418,7 +454,7 @@ void setup() {
 	#endif
   #ifdef DEBUG_MODULES
     led.light(CRGB::Purple);
-    display.printTitle("DEBUG");
+    display.renderTitle("DEBUG");
     logger.print("Relay switching on...");
     relay.on();
     delay(1000);
@@ -441,6 +477,29 @@ void setup() {
       }
 		}
 	#endif
+  #ifdef DEBUG_D2D
+    logger.print(F("[D2D] Sunrise/sunset in Jan 2024:"));
+    SolarTime solarTime = d2d.getSolarTime(1, 1, 2024);
+    logger.print(rtc.msmToString(solarTime.sunriseMsm, false) + " / " + rtc.msmToString(solarTime.sunsetMsm, false));
+
+    logger.print(F("[D2D] Sunrise/sunset in Apr 2024:"));
+    solarTime = d2d.getSolarTime(1, 4, 2024);
+    logger.print(rtc.msmToString(solarTime.sunriseMsm, false) + " / " + rtc.msmToString(solarTime.sunsetMsm, false));
+
+    logger.print(F("[D2D] Sunrise/sunset in Jul 2024:"));
+    solarTime = d2d.getSolarTime(25, 7, 2024);
+    logger.print(rtc.msmToString(solarTime.sunriseMsm, false) + " / " + rtc.msmToString(solarTime.sunsetMsm, false));
+
+    logger.print(F("[D2D] Sunrise/sunset in Oct 2024:"));
+    solarTime = d2d.getSolarTime(1, 10, 2024);
+    logger.print(rtc.msmToString(solarTime.sunriseMsm, false) + " / " + rtc.msmToString(solarTime.sunsetMsm, false));
+
+    logger.print(F("[D2D] Sunrise/sunset today"));
+    solarTime = d2d.getSolarTime(localDay, localMonth, localYear);
+    logger.print(rtc.msmToString(solarTime.sunriseMsm, false) + " / " + rtc.msmToString(solarTime.sunsetMsm, false));
+  #endif
+
+  runAutoCommands();
 
   renderPage(currentPage);
 
@@ -523,22 +582,14 @@ void loop() {
   }
 
   if (current - timer_pageReset >= 10000) {
-    uint16_t currentMsm = rtc.minutesSinceMidnight();
-
-    switch (currentMode) {
-      case Schedule: {
-        RelayCommand scheduleCommand = Schedule::getCommand(currentMsm, scheduleOnTime, scheduleOffTime, relay.getState());
-        // logger.print(scheduleCommand);
-        resolveRelayCommand(scheduleCommand);
-        break;
-      }
-    }
+    runAutoCommands();
 
     if (counter_displaySleep < 2) {
       counter_displaySleep++;
       displaySleeping = false;
     } else if (!displaySleeping) {
       saveSettings();
+      setSolarTime();
       display.clear();
       displaySleeping = true;
       setupMode = false;
