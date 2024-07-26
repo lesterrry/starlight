@@ -27,6 +27,7 @@ uint8_t localHours;
 uint8_t localDay;
 uint8_t localMonth;
 uint16_t localYear;
+uint16_t sleepTimerOffTime = 0;
 
 MemoryEntry mem_currentMode(64);
 MemoryEntry mem_scheduleOnTime(0);
@@ -81,6 +82,13 @@ void setSolarTime() {
   currentSolarTime = d2d.getSolarTime(25, 7, 2024, d2dDuskOffset, d2dDawnOffset);
 }
 
+void setSleepTimerOffTime() {
+  uint16_t offTime = rtc.minutesSinceMidnight();
+  adjustValue(offTime, 0, 1439, false, sleepTimer);
+  logger.print("Current sleep time: " + rtc.msmToString(offTime, false));
+  sleepTimerOffTime = offTime;
+}
+
 void saveSettings() {
   logger.print(F("Saving settings..."));
   switch (currentPage) {
@@ -97,6 +105,7 @@ void saveSettings() {
     }
     case SleepTimerSettings: {
       mem_sleepTimer.write(sleepTimer);
+      setSleepTimerOffTime();
       break;
     }
     case AdditionalSettings: {
@@ -182,6 +191,7 @@ void handleKnobClick() {
   logger.print(F("[Knob] click"));
   if (currentPage == Home) {
     toggleRelay();
+    setSleepTimerOffTime();
     manualOverrideCommand = relay.getState() ? TurnOn : TurnOff;
   } else if (currentPage > Home) {
     if (!setupMode) {
@@ -257,15 +267,17 @@ void renderPage(uint8_t page) {
       break;
     }
     case SleepTimerSettings: {
+      setSleepTimerOffTime();
       cursorLimit = 0;
       String timer = "TIMER: " + String(sleepTimer);
+      String offTime = rtc.msmToString(sleepTimerOffTime, false);
       String title = PAGE_NAMES[page];
       if (setupMode) {
         title += SETUP_MODE_MARKER;
         display.clear(false);
         display.printCursor(Display::List, cursorPosition);
       }
-      display.renderLayout(Display::List, !setupMode, title, timer);
+      display.renderLayout(Display::List, !setupMode, title, timer, "", offTime);
       break;
     }
     case AdditionalSettings: {
@@ -351,7 +363,7 @@ void resolveRelayCommand(uint8_t automaticCommand) {
 
 void runAutoCommands() {
   uint16_t currentMsm = rtc.minutesSinceMidnight();
-  RelayCommand command;
+  RelayCommand command = None;
 
   switch (currentMode) {
     case Schedule: {
@@ -360,6 +372,11 @@ void runAutoCommands() {
     }
     case DuskToDawn: {
       command = Schedule::getCommand(currentMsm, currentSolarTime.sunsetMsm, currentSolarTime.sunriseMsm, relay.getState());
+      break;
+    }
+    case SleepTimer: {
+      if (sleepTimerOffTime <= currentMsm || !relay.getState()) break;
+      command = Schedule::getCommand(currentMsm, 0, sleepTimerOffTime, true);
       break;
     }
   }
@@ -382,6 +399,12 @@ String getUpcomingCommandText() {
     case DuskToDawn: {
       upcomingCommand = Schedule::getUpcomingCommand(currentMsm, currentSolarTime.sunsetMsm, currentSolarTime.sunriseMsm, relay.getState());
       logger.print(String(currentSolarTime.sunsetMsm) + " -> " + String(currentSolarTime.sunriseMsm));
+      break;
+    }
+    case SleepTimer: {
+      if (sleepTimerOffTime <= currentMsm || !relay.getState()) break;
+      upcomingCommand = Schedule::getUpcomingCommand(currentMsm, 0, sleepTimerOffTime, true);
+      logger.print(String(currentMsm) + " -> " + String(sleepTimerOffTime));
       break;
     }
   }
@@ -418,6 +441,7 @@ void setup() {
 
     setLocalTime();
     setSolarTime();
+    setSleepTimerOffTime();
 
     bootTime = rtc.unix();
   }
