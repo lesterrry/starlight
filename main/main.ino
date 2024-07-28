@@ -5,7 +5,7 @@ Interactive time-sensitive relay
 me@aydar.media
 ******************************/
 
-#define DEBUG 1
+#define DEBUG 0
 #define SET_RTC_COMPILE_TIME 0
 
 #define VERSION "0.1.0"
@@ -13,7 +13,7 @@ me@aydar.media
 #undef DEBUG_TONES
 #undef DEBUG_MODULES
 #undef DEBUG_D2D
-#define QUICK_BOOT
+#undef QUICK_BOOT
 #undef CLEAR_EEPROM
 #define FASTLED_INTERNAL
 
