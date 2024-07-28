@@ -1,14 +1,21 @@
 class Buzzer {
   public:
-    Buzzer(int pin) {
+    Buzzer(int pin, bool active = true) {
       _pin = pin;
+      _active = active;
+    }
+
+    void setActive(bool active) {
+      _active = active;
     }
 
     void sound(unsigned int frequency, uint8_t duration = 0) {
+      if (!_active) return;
       tone(_pin, frequency, duration);
     }
 
     void beep(uint8_t frequencyDegree, uint8_t toneDuration = 25, bool invert = false) {
+      if (!_active) return;
       unsigned int frequency = frequencyDegree * 50;
       tone(_pin, frequency, toneDuration);
       delay(toneDuration - 25);
@@ -37,5 +44,6 @@ class Buzzer {
 
   private:
     int _pin;
+    bool _active;
 };
 

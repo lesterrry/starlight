@@ -112,6 +112,7 @@ void saveSettings() {
       mem_remoteEnabled.write(remoteEnabled);
       mem_displaySleepEnabled.write(displaySleepEnabled);
       mem_soundEnabled.write(soundEnabled);
+      buzzer.setActive(soundEnabled);
       break;
     }
     case TimeSettings:
@@ -128,6 +129,7 @@ void handleKnobRotation(bool direction, bool pressed = false) {
   if (displaySleeping) return;
 
   if (pressed) {
+    if (!setupMode) return;
     buzzer.beep(6);
     switch (currentPage) {
       case Home: {
@@ -211,7 +213,7 @@ void handleKnobClick() {
 
 void handleRemoteClick() {
   logger.print(F("[Radio] click"));
-  toggleRelay();
+  if (remoteEnabled) toggleRelay();
 }
 
 void renderPage(uint8_t page) {
@@ -225,8 +227,7 @@ void renderPage(uint8_t page) {
     case Info: {
       String uptime = "UP: " + rtc.getUnixDelta(bootTime);
       String temp = "TEMP: " + String(rtc.getTemp());
-      String date = "DATE: " + String(rtc.getDate(true));
-      display.renderLayout(Display::List, true, PAGE_NAMES[page], uptime, temp, date);
+      display.renderLayout(Display::List, true, PAGE_NAMES[page], uptime, temp);
       break;
     }
     case Home: {
@@ -426,6 +427,7 @@ void setup() {
   logger.print(VERSION);
 
   led.off();
+  buzzer.setActive(soundEnabled);
 
   if (!rtc.isConnected()) {
     logger.print(F("[RTC] Not connected"));
@@ -611,10 +613,10 @@ void loop() {
     if (counter_displaySleep < 2) {
       counter_displaySleep++;
       displaySleeping = false;
-    } else if (!displaySleeping) {
+    } else if (!displaySleeping && (displaySleepEnabled == 1 || (displaySleepEnabled == 2 && !relay.getState()))) {
+      display.clear();
       saveSettings();
       setSolarTime();
-      display.clear();
       displaySleeping = true;
       setupMode = false;
     }
