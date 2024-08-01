@@ -8,14 +8,14 @@ me@aydar.media
 #define DEBUG 0
 #define SET_RTC_COMPILE_TIME 0
 
-#define VERSION "0.1.0"
+#define VERSION "0.1.1"
 
 #undef DEBUG_TONES
 #undef DEBUG_MODULES
 #undef DEBUG_D2D
 #undef QUICK_BOOT
 #undef CLEAR_EEPROM
-#define FASTLED_INTERNAL
+#undef FASTLED_INTERNAL
 
 #define RELAY_PIN      7
 #define RADIO_PIN      31

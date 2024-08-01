@@ -376,7 +376,7 @@ void runAutoCommands() {
       break;
     }
     case SleepTimer: {
-      if (sleepTimerOffTime <= currentMsm || !relay.getState()) break;
+      if (sleepTimerOffTime < currentMsm || !relay.getState()) break;
       command = Schedule::getCommand(currentMsm, 0, sleepTimerOffTime, true);
       break;
     }
