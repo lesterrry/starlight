@@ -376,7 +376,7 @@ void runAutoCommands() {
       break;
     }
     case SleepTimer: {
-      if (sleepTimerOffTime < currentMsm || !relay.getState()) break;
+      if (!relay.getState()) break;
       command = Schedule::getCommand(currentMsm, 0, sleepTimerOffTime, true);
       break;
     }
@@ -403,7 +403,7 @@ String getUpcomingCommandText() {
       break;
     }
     case SleepTimer: {
-      if (sleepTimerOffTime <= currentMsm || !relay.getState()) break;
+      if (sleepTimerOffTime < currentMsm || !relay.getState()) break;
       upcomingCommand = Schedule::getUpcomingCommand(currentMsm, 0, sleepTimerOffTime, true);
       logger.print(String(currentMsm) + " -> " + String(sleepTimerOffTime));
       break;
