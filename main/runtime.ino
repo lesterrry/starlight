@@ -79,7 +79,7 @@ void setLocalTime() {
 }
 
 void setSolarTime() {
-  currentSolarTime = d2d.getSolarTime(25, 7, 2024, d2dDuskOffset, d2dDawnOffset);
+  currentSolarTime = d2d.getSolarTime(localDay, localMonth, localYear, d2dDuskOffset, d2dDawnOffset);
 }
 
 void setSleepTimerOffTime() {
