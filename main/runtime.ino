@@ -423,7 +423,7 @@ String getUpcomingCommandText() {
 
 void setup() {
   logger.begin();
-  logger.print(F("Sunset initializing..."));
+  logger.print(F("Starlight initializing..."));
   logger.print(VERSION);
 
   led.off();
@@ -462,7 +462,7 @@ void setup() {
     mem_soundEnabled.write(0);
   #endif
   #ifndef QUICK_BOOT
-    display.renderTitle(F("SUBURBS:"), F("SUNSET"));
+    display.renderTitle(F("SUBURBS:"), F("STARLIGHT"));
     buzzer.playToneB();
     delay(2000);
     display.renderTitle("", String(VERSION) + "      " + String(BUILD_DATE));
