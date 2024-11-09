@@ -8,7 +8,7 @@ me@aydar.media
 #define DEBUG 0
 #define SET_RTC_COMPILE_TIME 0
 
-#define VERSION "0.1.2"
+#define VERSION "0.1.3"
 
 #undef DEBUG_TONES
 #undef DEBUG_MODULES
