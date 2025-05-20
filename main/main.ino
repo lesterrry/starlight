@@ -8,7 +8,7 @@ me@aydar.media
 #define DEBUG 0
 #define SET_RTC_COMPILE_TIME 0
 
-#define VERSION "0.1.3"
+#define VERSION "0.2.0"
 
 #undef DEBUG_TONES
 #undef DEBUG_MODULES
@@ -18,7 +18,6 @@ me@aydar.media
 #undef FASTLED_INTERNAL
 
 #define RELAY_PIN      7
-#define RADIO_PIN      31
 #define OLED_MOSI_PIN  35
 #define OLED_CLK_PIN   37
 #define OLED_DC_PIN    39
@@ -35,6 +34,7 @@ me@aydar.media
 #define LONGITUDE      56.237472
 #define LATITUDE       36.841194
 #define TIMEZONE       3
+#define MAC_ADDRESS    { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED }
 
 #include <microDS3231.h>
 #include <SPI.h>
@@ -45,3 +45,4 @@ me@aydar.media
 #include <FastLED.h>
 #include <Dusk2Dawn.h>
 #include <EEPROM.h>
+#include <Ethernet2.h>

@@ -1,12 +1,12 @@
 Logger logger(DEBUG);
 Relay relay(RELAY_PIN);
-Radio radio(RADIO_PIN);
 RTC rtc;
 Display display(OLED_MOSI_PIN, OLED_CLK_PIN, OLED_DC_PIN, OLED_RESET_PIN, OLED_CS_PIN);
 Knob knob(ENC_CLK_PIN, ENC_DT_PIN, ENC_SW_PIN);
 Buzzer buzzer(BUZZER_PIN);
 LED led(LED_NUMBER, LED_BRIGHTNESS);
 D2D d2d(LONGITUDE, LATITUDE, TIMEZONE);
+EthernetService ethernetService;
 
 uint32_t bootTime;
 Page currentPage = Home;
@@ -35,7 +35,7 @@ MemoryEntry mem_scheduleOffTime(2);
 MemoryEntry mem_d2dDuskOffset(4);
 MemoryEntry mem_d2dDawnOffset(6);
 MemoryEntry mem_sleepTimer(8);
-MemoryEntry mem_remoteEnabled(10);
+MemoryEntry mem_ethernetEnabled(10);
 MemoryEntry mem_displaySleepEnabled(12);
 MemoryEntry mem_soundEnabled(14);
 
@@ -45,7 +45,7 @@ uint16_t scheduleOffTime = mem_scheduleOffTime.read();
 int16_t d2dDuskOffset = mem_d2dDuskOffset.read();
 int16_t d2dDawnOffset = mem_d2dDawnOffset.read();
 uint16_t sleepTimer = mem_sleepTimer.read();
-uint16_t remoteEnabled = mem_remoteEnabled.read();
+uint16_t ethernetEnabled = mem_ethernetEnabled.read();
 uint16_t displaySleepEnabled = mem_displaySleepEnabled.read();
 uint16_t soundEnabled = mem_soundEnabled.read();
 
@@ -109,7 +109,7 @@ void saveSettings() {
       break;
     }
     case AdditionalSettings: {
-      mem_remoteEnabled.write(remoteEnabled);
+      mem_ethernetEnabled.write(ethernetEnabled);
       mem_displaySleepEnabled.write(displaySleepEnabled);
       mem_soundEnabled.write(soundEnabled);
       buzzer.setActive(soundEnabled);
@@ -149,7 +149,7 @@ void handleKnobRotation(bool direction, bool pressed = false) {
         break;
       }
       case AdditionalSettings: {
-        adjustValue(cursorPosition == 0 ? remoteEnabled : (cursorPosition == 1 ? displaySleepEnabled : soundEnabled), 0, cursorPosition == 1 ? 2 : 1, direction == Left, 1);
+        adjustValue(cursorPosition == 0 ? ethernetEnabled : (cursorPosition == 1 ? displaySleepEnabled : soundEnabled), 0, cursorPosition == 1 ? 2 : 1, direction == Left, 1);
         break;
       }
       case TimeSettings: {
@@ -211,11 +211,6 @@ void handleKnobClick() {
   }
 }
 
-void handleRemoteClick() {
-  logger.print(F("[Radio] click"));
-  if (remoteEnabled) toggleRelay();
-}
-
 void renderPage(uint8_t page) {
   logger.print("Rendering page " + String(page));
   switch (page) {
@@ -227,7 +222,8 @@ void renderPage(uint8_t page) {
     case Info: {
       String uptime = "UP: " + rtc.getUnixDelta(bootTime);
       String temp = "TEMP: " + String(rtc.getTemp());
-      display.renderLayout(Display::List, true, PAGE_NAMES[page], uptime, temp);
+      String ip = "IP: " + ethernetService.localIP();
+      display.renderLayout(Display::List, true, PAGE_NAMES[page], uptime, temp, ip);
       break;
     }
     case Home: {
@@ -283,7 +279,7 @@ void renderPage(uint8_t page) {
     }
     case AdditionalSettings: {
       cursorLimit = 2;
-      String remote = "REMOTE: " + String(ON_OFF_NAMES[remoteEnabled]);
+      String ethernet = "ETHERNET: " + String(ON_OFF_NAMES[ethernetEnabled]);
       String displaySleep = "SCREEN SLEEP: " + String(ON_OFF_NAMES[displaySleepEnabled]);
       String sound = "SOUND: " + String(ON_OFF_NAMES[soundEnabled]);
       String title = PAGE_NAMES[page];
@@ -292,7 +288,7 @@ void renderPage(uint8_t page) {
         display.clear(false);
         display.printCursor(Display::List, cursorPosition);
       }
-      display.renderLayout(Display::List, !setupMode, title, remote, displaySleep, sound);
+      display.renderLayout(Display::List, !setupMode, title, ethernet, displaySleep, sound);
       break;
     }
     case TimeSettings: {
@@ -342,15 +338,19 @@ void toggleRelay() {
   buzzer.beep(6, 100, !relay.getState());
 }
 
-void runRelayCommand(uint8_t command) {
+void runRelayCommand(uint8_t command, bool resetOverrides = true) {
   if (command == TurnOn) {
     relay.on();
     led.on();
-    manualOverrideCommand = None;
+    if (displaySleepEnabled == 2) {
+      displaySleeping = false;
+      renderPage(currentPage);
+    }
+    if (resetOverrides) manualOverrideCommand = None;
   } else if (command == TurnOff) {
     relay.off();
     led.off();
-    manualOverrideCommand = None;
+    if (resetOverrides) manualOverrideCommand = None;
   }
 }
 
@@ -421,10 +421,58 @@ String getUpcomingCommandText() {
   return result;
 }
 
+String getStateJSON() {
+  String json = "{\"isOn\": ";
+  json += relay.getState() ? "true" : "false";
+  json += "}";
+  return json;
+}
+
+void listenEthernet() {
+  EthernetClient client = ethernetService.available();
+
+  if (client) {
+    logger.print("New HTTP client");
+
+    String request = "";
+
+    while (client.connected()) {
+      if (client.available()) {
+        char c = client.read();
+        request += c;
+
+        if (c == '\n') {  // Response end
+          String route = ethernetService.parseRequestRoute(request);
+          logger.print(route);
+
+          if (route == "/on") {
+            manualOverrideCommand = TurnOn;
+            runRelayCommand(TurnOn, false);
+          } else if (route == "/off") {
+            manualOverrideCommand = TurnOff;
+            runRelayCommand(TurnOff, false);
+          }
+
+          logger.print(getStateJSON());
+          ethernetService.respond(client, getStateJSON());
+          break;
+        }
+      }
+    }
+
+    delay(1);
+    client.stop();
+  }
+}
+
 void setup() {
   logger.begin();
   logger.print(F("Starlight initializing..."));
   logger.print(VERSION);
+
+  if (!ethernetService.begin()) {
+    logger.print("Failed to configure Ethernet using DHCP");
+  }
 
   led.off();
   buzzer.setActive(soundEnabled);
@@ -457,7 +505,7 @@ void setup() {
     mem_d2dDuskOffset.write(0);
     mem_d2dDawnOffset.write(0);
     mem_sleepTimer.write(0);
-    mem_remoteEnabled.write(0);
+    mem_ethernetEnabled.write(0);
     mem_displaySleepEnabled.write(0);
     mem_soundEnabled.write(0);
   #endif
@@ -489,10 +537,6 @@ void setup() {
 
 		while(true) {
       knob.update();
-
-      if (radio.isReceiving()) {
-        logger.print("Radio: receiving");
-      }
 
       if (knob.isRight()) {
         logger.print("Knob: left");
@@ -539,12 +583,12 @@ void loop() {
 
   knob.update();
 
+  if (ethernetEnabled) {
+    listenEthernet();
+  }
+
   pageSwitched = false;
   modeSwitched = false;
-
-  if (radio.isReceiving()) {
-    handleRemoteClick();
-  }
 
   if (knob.isRight()) {
     buzzer.beep(4);
@@ -601,7 +645,7 @@ void loop() {
       needsRerender = true;
     }
 
-    if(needsRerender) renderPage(currentPage);
+    if (needsRerender) renderPage(currentPage);
 
     earlyClick = false;
     timer_pageRender = current;
